@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CardioScan AI — Neural 12-Lead ECG Interpretability Engine. AI-powered diagnostic dashboard for cardiac waveform analysis.">
+    <title>CardioScan AI · Diagnostic Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="app-container">
+
+    <!-- ─── Sidebar ──────────────────────────────────────────── -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo-icon">♡</div>
+            <div class="brand-text">
+                <h1>CardioScan AI</h1>
+                <span>Diagnostic Engine v1.0</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <button class="nav-tab active" data-panel="diagnostics" id="nav-diagnostics">
+                <span class="tab-icon">📊</span> <span>Diagnostics</span>
+            </button>
+            <button class="nav-tab" data-panel="technical-review" id="nav-technical-review">
+                <span class="tab-icon">🔬</span> <span>Technical Review</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-section">
+            <label for="patientSlider">Patient Record</label>
+            <div class="patient-slider-row">
+                <input type="range" id="patientSlider" class="patient-slider" min="0" max="49" value="0">
+                <span class="patient-idx-display" id="patientIdxDisplay">0</span>
+            </div>
+        </div>
+
+        <button class="btn-analyze" id="btnAnalyze">
+            <div class="spinner"></div>
+            <span class="btn-icon" style="font-style: normal;">⚡</span>
+            <span class="btn-text">Analyze Waveform</span>
+        </button>
+    </aside>
+
+    <!-- Sidebar Toggle (desktop) -->
+    <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+        <span class="toggle-icon">❮</span>
+    </button>
+
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" title="Menu">☰</button>
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- ─── Main Area ────────────────────────────────────────── -->
+    <main class="main-content">
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <h2 id="pageTitle">Diagnostic Center</h2>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                Core Active
+            </div>
+        </div>
+
+        <!-- ═══ Panel 1: Diagnostics ═══════════════════════════ -->
+        <section class="page-panel active" id="panel-diagnostics">
+
+            <!-- Welcome State -->
+            <div id="welcomeState">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🩺 Validation Gallery</h3>
+                        <span class="card-badge">Class Representatives</span>
+                    </div>
+                    <div class="gallery-grid" id="galleryGrid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results State (hidden until analysis) -->
+            <div id="resultsState" style="display:none;">
+
+                <!-- Loading Overlay -->
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner"></div>
+                    <p>Analyzing waveform…</p>
+                </div>
+
+                <!-- ── Hero Diagnosis Banner ────────────────────── -->
+                <div class="diagnosis-hero">
+                    <div class="hero-left">
+                        <div class="hero-case">
+                            <span class="hero-case-label">CASE</span>
+                            <span class="hero-case-id" id="caseIdLabel">#0</span>
+                        </div>
+                        <div class="hero-detection">
+                            <span class="hero-detection-value" id="metricDetection">—</span>
+                            <span class="hero-detection-sub" id="metricDetectionSub">Predicted by ResNet-1D</span>
+                        </div>
+                    </div>
+                    <div class="hero-center">
+                        <canvas id="confidenceRing" width="130" height="130"></canvas>
+                        <div class="hero-confidence-label">
+                            <span class="hero-confidence-value" id="metricConfidence">—</span>
+                            <span class="hero-confidence-sub">Confidence</span>
+                        </div>
+                    </div>
+                    <div class="hero-right">
+                        <span class="hero-truth-label">Ground Truth</span>
+                        <span class="hero-truth-value" id="metricTruth">—</span>
+                        <span class="hero-truth-sub">PTB-XL diagnostic label</span>
+                    </div>
+                </div>
+
+                <!-- ── Class Probabilities (Donut Chart) ────────── -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📊 Class Probabilities</h3>
+                        <span class="card-badge">Sigmoid</span>
+                    </div>
+                    <div class="prob-chart-row">
+                        <canvas id="probDonut" width="220" height="220"></canvas>
+                        <div class="prob-legend" id="probLegend">
+                            <!-- Built by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── ECG Grid ─────────────────────────────────── -->
+                <div class="card">
+                    <div class="card-header" style="flex-wrap: wrap; gap: var(--space-sm);">
+                        <div style="display: flex; align-items: center; gap: var(--space-sm);">
+                            <h3>💓 12-Lead ECG Waveforms</h3>
+                            <span class="card-badge">500Hz · 10s</span>
+                        </div>
+                        <div class="zoom-controls">
+                            <button id="btnZoomOut" class="zoom-btn" title="Zoom Out">− Zoom</button>
+                            <span id="zoomLevelDisplay" style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600;">100%</span>
+                            <button id="btnZoomIn" class="zoom-btn" title="Zoom In">+ Zoom</button>
+                            <button id="btnZoomReset" class="zoom-btn" title="Reset Zoom">Reset</button>
+                        </div>
+                    </div>
+                    <div class="ecg-scroll-container" id="ecgGridWrapper">
+                        <div class="ecg-grid" id="ecgGrid">
+                            <!-- 12 lead canvases injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ═══ Panel 2: Technical Review ══════════════════════ -->
+        <section class="page-panel" id="panel-technical-review">
+
+            <!-- Loading placeholder -->
+            <div id="insightsLoading" style="text-align:center; padding:80px 0;">
+                <div style="width:80px;height:80px;background:var(--primary-soft);border-radius:50%;margin:0 auto var(--space-md);display:flex;align-items:center;justify-content:center;font-size:2rem;">🔬</div>
+                <h3 style="color:var(--charcoal); margin-bottom:var(--space-xs);">Loading Technical Review…</h3>
+                <p style="color:var(--slate); font-size:0.85rem;">Compiling model analysis data.</p>
+            </div>
+
+            <div id="insightsContent" style="display:none;">
+
+                <!-- ── Section 1: Dataset Understanding ────────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle active" data-target="sec-dataset">
+                        <span class="tr-toggle-num">01</span>
+                        <span class="tr-toggle-title">Dataset Understanding</span>
+                        <span class="tr-toggle-arrow">▾</span>
+                    </button>
+                    <div class="tr-body active" id="sec-dataset">
+
+                        <div class="tr-subsection">
+                            <h4>Data Source</h4>
+                            <p>The dataset used is the <span class="hl hl-blue">PTB-XL ECG Dataset</span>, a large clinical ECG dataset containing diagnostic labels.</p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Raw Data Characteristics</h4>
+                            <p>From the preprocessing pipeline:</p>
+                            <div class="tr-code">Signal shape (after processing): <strong>(N, 12, 5000)</strong></div>
+                            <table class="tr-table">
+                                <thead><tr><th>Dimension</th><th>Meaning</th></tr></thead>
+                                <tbody>
+                                    <tr><td><code>N</code></td><td>Number of ECG recordings</td></tr>
+                                    <tr><td><code>12</code></td><td><span class="hl hl-blue">12-lead</span> ECG channels</td></tr>
+                                    <tr><td><code>5000</code></td><td>Time samples (<span class="hl hl-green">10 seconds</span> at <span class="hl hl-green">500Hz</span>)</td></tr>
+                                </tbody>
+                            </table>
+                            <p>Each ECG sample is: <span class="hl-underline">12-lead waveform × 5000 timesteps</span></p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Data Types</h4>
+                            <div class="tr-info-row">
+                                <div class="tr-info-chip">Signals → <code>float32</code></div>
+                                <div class="tr-info-chip">Labels → <span class="hl hl-purple">multi-hot</span> encoded vectors <code>(float32)</code></div>
+                            </div>
+                            <p>Example label vector:</p>
+                            <div class="tr-code">[<span style="color:var(--success)">1</span>, 0, 0, <span style="color:var(--success)">1</span>, 0]</div>
+                            <p>Corresponding to the diagnostic classes:</p>
+                            <div class="tr-code">[<span class="hl hl-green">'NORM'</span>, <span class="hl hl-red">'MI'</span>, <span class="hl hl-orange">'STTC'</span>, <span class="hl hl-purple">'CD'</span>, <span class="hl hl-pink">'HYP'</span>]</div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Label Processing</h4>
+                            <ul class="tr-list">
+                                <li><span class="hl hl-blue">SCP diagnostic codes</span> loaded</li>
+                                <li>Mapped to diagnostic <span class="hl hl-purple">superclass</span></li>
+                                <li>Encoded using <code>MultiLabelBinarizer()</code></li>
+                            </ul>
+                            <div class="tr-callout">
+                                <span class="tr-callout-icon">📌</span>
+                                <span>Task type: <span class="hl-underline">Multi-label classification</span></span>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Signal Preprocessing</h4>
+
+                            <div class="tr-step hover-lift">
+                                <div class="tr-step-num">1</div>
+                                <div class="tr-step-content">
+                                    <h5>Bandpass Filtering</h5>
+                                    <div class="tr-code">butter(4, [<span class="hl hl-green">0.5</span>, <span class="hl hl-green">150</span>])</div>
+                                    <p>Purpose — Remove:</p>
+                                    <ul class="tr-list">
+                                        <li>Baseline drift (<span class="hl hl-orange">&lt;0.5Hz</span>)</li>
+                                        <li>High-frequency noise (<span class="hl hl-orange">&gt;150Hz</span>)</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="tr-step hover-lift">
+                                <div class="tr-step-num">2</div>
+                                <div class="tr-step-content">
+                                    <h5>Signal Normalization</h5>
+                                    <div class="tr-code">(signal - <span class="hl hl-blue">mean</span>) / <span class="hl hl-blue">std</span></div>
+                                    <p>Applied per signal channel. Benefits:</p>
+                                    <ul class="tr-list">
+                                        <li><span class="hl hl-green">Stabilizes</span> gradient updates</li>
+                                        <li><span class="hl hl-green">Improves</span> convergence for deep networks</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="tr-step hover-lift">
+                                <div class="tr-step-num">3</div>
+                                <div class="tr-step-content">
+                                    <h5>Tensor Shape Conversion</h5>
+                                    <div class="tr-code">Original: <span class="hl hl-orange">(5000, 12)</span>  →  Converted: <span class="hl hl-green">(12, 5000)</span></div>
+                                    <p>Required for <code>Conv1D(in_channels=12)</code></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Dataset Objective</h4>
+                            <p>The model uses <span class="hl hl-blue">supervised learning</span>.</p>
+                            <div class="tr-math">
+                                <p>Target: <span class="hl hl-purple">ECG</span> → <span class="hl hl-green">diagnostic label vector</span></p>
+                                <p class="tr-formula">f(x) = y</p>
+                                <p>Where <code>x ∈ ℝ<sup>(12×5000)</sup></code> and <code>y ∈ {0,1}<sup>5</sup></code></p>
+                            </div>
+                            <p>Loss: <code>BCEWithLogitsLoss</code> — <span class="hl-underline">multi-label classification</span>.</p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Data Augmentation</h4>
+                            <div class="tr-callout warning">
+                                <span class="tr-callout-icon">⚠️</span>
+                                <span>Currently <span class="hl hl-red">no augmentation</span> is used. This is a limitation because ECG models typically benefit from:</span>
+                            </div>
+                            <div class="tr-info-row">
+                                <div class="tr-info-chip muted">Time warping</div>
+                                <div class="tr-info-chip muted">Gaussian noise</div>
+                                <div class="tr-info-chip muted">Random cropping</div>
+                                <div class="tr-info-chip muted">Lead dropout</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ── Section 2: Encoder Architecture ─────────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle" data-target="sec-architecture">
+                        <span class="tr-toggle-num">02</span>
+                        <span class="tr-toggle-title">Encoder Architecture Deep-Dive</span>
+                        <span class="tr-toggle-arrow">▸</span>
+                    </button>
+                    <div class="tr-body" id="sec-architecture">
+
+                        <div class="tr-subsection">
+                            <h4>Architecture Overview</h4>
+                            <p>The encoder is a <span class="hl-underline">1D Residual Network</span> designed for ECG signals.</p>
+                            <p>Model name in code: <code>ECGResNet016</code></p>
+
+                            <div class="arch-flow">
+                                <div class="arch-node input hover-lift">Input<span>(12, 5000)</span></div>
+                                <div class="arch-arrow">↓</div>
+                                <div class="arch-node hover-lift">ResidualBlock<span>12 → 24, stride=2</span></div>
+                                <div class="arch-arrow">↓</div>
+                                <div class="arch-node hover-lift">ResidualBlock<span>24 → 32, stride=2</span></div>
+                                <div class="arch-arrow">↓</div>
+                                <div class="arch-node hover-lift">ResidualBlock<span>32 → 48, stride=2</span></div>
+                                <div class="arch-arrow">↓</div>
+                                <div class="arch-node hover-lift">ResidualBlock<span>48 → 64, stride=2</span></div>
+                                <div class="arch-arrow">↓</div>
+                                <div class="arch-node pool hover-lift">AdaptiveAvgPool1d<span>(1)</span></div>
+                                <div class="arch-arrow">↓</div>
+                                <div class="arch-node output hover-lift">Latent Vector<span>(64D)</span></div>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Residual Block Design</h4>
+                            <p>Each block consists of:</p>
+                            <div class="tr-block-flow">
+                                <span>Conv1D(k=7)</span>
+                                <span>→</span>
+                                <span>BatchNorm</span>
+                                <span>→</span>
+                                <span>ReLU</span>
+                                <span>→</span>
+                                <span>Conv1D(k=7)</span>
+                                <span>→</span>
+                                <span>BatchNorm</span>
+                                <span>→</span>
+                                <span class="block-skip">+ Skip</span>
+                                <span>→</span>
+                                <span>ReLU</span>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Detailed Architecture</h4>
+                            <div class="tr-code-block">
+<pre>Sequential(
+  (0): ResidualBlock(
+    (conv1): Conv1d(<span style="color:#93c5fd">12</span>, <span style="color:#86efac">24</span>, kernel_size=(7,), stride=(2,), padding=(3,))
+    (bn1):   BatchNorm1d(24)
+    (conv2): Conv1d(24, 24, kernel_size=(7,), stride=(1,), padding=(3,))
+    (bn2):   BatchNorm1d(24)
+    (shortcut): Conv1d(12, 24, kernel_size=(1,), stride=(2,)) + BN
+  )
+  (1): ResidualBlock(
+    (conv1): Conv1d(<span style="color:#93c5fd">24</span>, <span style="color:#86efac">32</span>, kernel_size=(7,), stride=(2,), padding=(3,))
+    (bn1):   BatchNorm1d(32)
+    (conv2): Conv1d(32, 32, kernel_size=(7,), stride=(1,), padding=(3,))
+    (bn2):   BatchNorm1d(32)
+    (shortcut): Conv1d(24, 32, kernel_size=(1,), stride=(2,)) + BN
+  )
+  (2): ResidualBlock(
+    (conv1): Conv1d(<span style="color:#93c5fd">32</span>, <span style="color:#86efac">48</span>, kernel_size=(7,), stride=(2,), padding=(3,))
+    (bn1):   BatchNorm1d(48)
+    (conv2): Conv1d(48, 48, kernel_size=(7,), stride=(1,), padding=(3,))
+    (bn2):   BatchNorm1d(48)
+    (shortcut): Conv1d(32, 48, kernel_size=(1,), stride=(2,)) + BN
+  )
+  (3): ResidualBlock(
+    (conv1): Conv1d(<span style="color:#93c5fd">48</span>, <span style="color:#86efac">64</span>, kernel_size=(7,), stride=(2,), padding=(3,))
+    (bn1):   BatchNorm1d(64)
+    (conv2): Conv1d(64, 64, kernel_size=(7,), stride=(1,), padding=(3,))
+    (bn2):   BatchNorm1d(64)
+    (shortcut): Conv1d(48, 64, kernel_size=(1,), stride=(2,)) + BN
+  )
+  (4): AdaptiveAvgPool1d(output_size=<span style="color:#fbbf24">1</span>)
+)</pre>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Why Residual Connections?</h4>
+                            <p>Residual learning solves:</p>
+                            <ul class="tr-list">
+                                <li><span class="hl hl-red">Vanishing gradients</span></li>
+                                <li><span class="hl hl-orange">Deeper network training instability</span></li>
+                            </ul>
+                            <p>Inspired by: <em>Deep Residual Learning for Image Recognition (He et al.)</em></p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Latent Space Representation</h4>
+                            <div class="tr-code">features = pool(x).squeeze(-1)  →  Output shape: [batch_size, <span class="hl hl-blue">64</span>]</div>
+                            <p>Latent representation dimension = <span class="hl hl-blue">64</span>. This embedding feeds into the classifier head. The encoder acts as: <span class="hl-underline">ECG → latent representation</span>.</p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Activation Functions</h4>
+                            <p>Used: <span class="hl hl-green">ReLU</span></p>
+                            <ul class="tr-list">
+                                <li>Avoids saturation</li>
+                                <li>Efficient gradient flow</li>
+                                <li>Computationally cheap</li>
+                            </ul>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Why This Architecture Fits ECG Data</h4>
+                            <p>ECG signals have <span class="hl hl-purple">local waveform patterns</span> and <span class="hl hl-purple">repeating morphology (PQRST)</span>. 1D CNNs capture temporal morphology.</p>
+                            <div class="tr-info-row">
+                                <div class="tr-info-chip">Kernel size: <strong>7</strong></div>
+                                <div class="tr-info-chip">QRS complex ≈ <span class="hl hl-green">80–120ms</span></div>
+                                <div class="tr-info-chip">Kernel window ≈ local morphology</div>
+                            </div>
+                            <p>Stride-2 downsampling reduces: <span class="hl hl-blue">5000</span> → <span class="hl hl-green">312</span>. Feature hierarchy emerges.</p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Parameter Efficiency</h4>
+                            <p>This model has only <span class="hl hl-green">~103K parameters</span>, extremely small compared to typical ECG models:</p>
+                            <table class="tr-table">
+                                <thead><tr><th>Model</th><th>Parameters</th></tr></thead>
+                                <tbody>
+                                    <tr><td>Typical ResNet ECG</td><td><span class="hl hl-red">~10M</span></td></tr>
+                                    <tr class="highlight"><td>This model (ECGResNet016)</td><td><span class="hl hl-green">~103K</span></td></tr>
+                                </tbody>
+                            </table>
+                            <div class="tr-info-row">
+                                <div class="tr-info-chip success">✓ Deployable</div>
+                                <div class="tr-info-chip success">✓ Edge-friendly</div>
+                                <div class="tr-info-chip success">✓ Faster inference</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ── Section 3: Training & Metrics ───────────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle" data-target="sec-training">
+                        <span class="tr-toggle-num">03</span>
+                        <span class="tr-toggle-title">Training & Metrics Analysis</span>
+                        <span class="tr-toggle-arrow">▸</span>
+                    </button>
+                    <div class="tr-body" id="sec-training">
+
+                        <div class="tr-subsection">
+                            <h4>Training Setup</h4>
+                            <div class="tr-stats-grid">
+                                <div class="tr-stat hover-lift"><span class="tr-stat-label">Train/Val Split</span><span class="tr-stat-value">80 / 20</span></div>
+                                <div class="tr-stat hover-lift"><span class="tr-stat-label">Batch Size</span><span class="tr-stat-value">64</span></div>
+                                <div class="tr-stat hover-lift"><span class="tr-stat-label">Epochs</span><span class="tr-stat-value">20</span></div>
+                                <div class="tr-stat hover-lift"><span class="tr-stat-label">Optimizer</span><span class="tr-stat-value">Adam (lr=0.001)</span></div>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Loss Function</h4>
+                            <div class="tr-code"><span class="hl hl-blue">BCEWithLogitsLoss()</span></div>
+                            <p>Correct choice for <span class="hl hl-blue">multi-label classification</span>. Why not softmax? Because ECG can have <span class="hl-underline">multiple diagnoses simultaneously</span>.</p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Training Loop</h4>
+                            <p>Standard pipeline:</p>
+                            <div class="tr-block-flow">
+                                <span>Forward</span><span>→</span>
+                                <span>Loss</span><span>→</span>
+                                <span>Backward</span><span>→</span>
+                                <span>optimizer.step</span>
+                            </div>
+                            <p>Validation monitored: <code>val_loss</code>. <span class="hl hl-green">Best checkpoint saved</span>.</p>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Evaluation Metrics</h4>
+
+                            <div class="tr-metric-explain">
+                                <div class="tr-metric-item hover-lift">
+                                    <div class="tr-metric-head">
+                                        <span class="tr-metric-num">1</span>
+                                        <h5>ROC-AUC</h5>
+                                    </div>
+                                    <div class="tr-code">roc_auc_score</div>
+                                    <p>Measures <span class="hl hl-blue">ranking quality</span> of predictions. Robust to class imbalance.</p>
+                                </div>
+                                <div class="tr-metric-item hover-lift">
+                                    <div class="tr-metric-head">
+                                        <span class="tr-metric-num">2</span>
+                                        <h5>F1 Score</h5>
+                                    </div>
+                                    <div class="tr-code">f1_score</div>
+                                    <p>Balances <span class="hl hl-green">precision</span> + <span class="hl hl-purple">recall</span>. Important in medical diagnosis.</p>
+                                </div>
+                                <div class="tr-metric-item hover-lift">
+                                    <div class="tr-metric-head">
+                                        <span class="tr-metric-num">3</span>
+                                        <h5>Precision</h5>
+                                    </div>
+                                    <div class="tr-code"><span class="hl hl-green">TP</span> / (<span class="hl hl-green">TP</span> + <span class="hl hl-red">FP</span>)</div>
+                                    <p>Clinical meaning: <em>How often predicted disease is <span class="hl hl-green">correct</span>.</em></p>
+                                </div>
+                                <div class="tr-metric-item hover-lift">
+                                    <div class="tr-metric-head">
+                                        <span class="tr-metric-num">4</span>
+                                        <h5>Recall</h5>
+                                    </div>
+                                    <div class="tr-code"><span class="hl hl-green">TP</span> / (<span class="hl hl-green">TP</span> + <span class="hl hl-red">FN</span>)</div>
+                                    <p>Clinical meaning: <em>How many real cases are <span class="hl hl-blue">detected</span>.</em></p>
+                                </div>
+                                <div class="tr-metric-item hover-lift">
+                                    <div class="tr-metric-head">
+                                        <span class="tr-metric-num">5</span>
+                                        <h5>Latent Space Evaluation</h5>
+                                    </div>
+                                    <p>Advanced representation analysis: <span class="hl hl-purple">t-SNE visualization</span> and <span class="hl hl-purple">Silhouette score</span>. These measure cluster separability of embeddings — a good sign of meaningful representations.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tr-subsection">
+                            <h4>Additional Evaluation Techniques</h4>
+                            <div class="tr-two-col">
+                                <div class="tr-col-card hover-lift">
+                                    <h5>🔍 Explainability — Saliency Maps</h5>
+                                    <div class="tr-code">∂output / ∂input</div>
+                                    <p>Used to highlight ECG regions <span class="hl hl-blue">influencing predictions</span>.</p>
+                                </div>
+                                <div class="tr-col-card hover-lift">
+                                    <h5>🛡️ Noise Stress Testing</h5>
+                                    <p>Robustness tested with <span class="hl hl-orange">0% → 100%</span> noise injection.</p>
+                                    <p>Metric: <span class="hl hl-purple">Cosine similarity</span> of embeddings.</p>
+                                    <div class="tr-callout success">
+                                        <span class="tr-callout-icon">✅</span>
+                                        <span>Very strong engineering practice.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ── Section 4: Potential Issues ─────────────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle" data-target="sec-issues">
+                        <span class="tr-toggle-num">04</span>
+                        <span class="tr-toggle-title">Potential Issues</span>
+                        <span class="tr-toggle-arrow">▸</span>
+                    </button>
+                    <div class="tr-body" id="sec-issues">
+
+                        <div class="tr-issue-grid">
+                            <div class="tr-issue-card danger hover-lift">
+                                <div class="tr-issue-num">1</div>
+                                <h5>Architecture Output Bug</h5>
+                                <p>The encoder returns <code>features (64)</code> but the loss expects <span class="hl hl-red">5-class logits</span>.</p>
+                                <p>Solution: <code>return fc(features)</code> or add a classifier head.</p>
+                                <span class="tr-issue-tag">Currently inconsistent</span>
+                            </div>
+                            <div class="tr-issue-card warning hover-lift">
+                                <div class="tr-issue-num">2</div>
+                                <h5>Overfitting Risk</h5>
+                                <p>Possible because: <span class="hl hl-orange">no augmentation</span>, small model, high dimensional signals.</p>
+                                <p>Mitigation: <span class="hl hl-green">Dropout</span>, <span class="hl hl-green">Weight decay</span>, <span class="hl hl-green">Augmentation</span></p>
+                                <span class="tr-issue-tag">Medium risk</span>
+                            </div>
+                            <div class="tr-issue-card warning hover-lift">
+                                <div class="tr-issue-num">3</div>
+                                <h5>Temporal Information Loss</h5>
+                                <p>Aggressive stride-2 downsampling: <span class="hl hl-blue">5000</span> → <span class="hl hl-orange">312</span></p>
+                                <p>May discard <span class="hl hl-red">subtle arrhythmia</span> patterns.</p>
+                                <span class="tr-issue-tag">Architectural</span>
+                            </div>
+                            <div class="tr-issue-card warning hover-lift">
+                                <div class="tr-issue-num">4</div>
+                                <h5>Class Imbalance</h5>
+                                <p>PTB-XL is highly imbalanced: <span class="hl hl-green">NORM</span> &gt;&gt; <span class="hl hl-red">MI</span></p>
+                                <p>Needs: <span class="hl hl-blue">Class weighting</span> in the loss function.</p>
+                                <span class="tr-issue-tag">Data</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ── Section 5: Results Interpretation ───────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle" data-target="sec-results">
+                        <span class="tr-toggle-num">05</span>
+                        <span class="tr-toggle-title">Results Interpretation</span>
+                        <span class="tr-toggle-arrow">▸</span>
+                    </button>
+                    <div class="tr-body" id="sec-results">
+
+                        <div class="tr-interpret-grid">
+                            <div class="tr-interpret-card hover-lift">
+                                <div class="tr-interpret-if">If the model shows</div>
+                                <h5>High <span class="hl hl-green">AUC</span> but low <span class="hl hl-red">F1</span></h5>
+                                <div class="tr-interpret-then">→ Model ranks well but thresholding is poor</div>
+                            </div>
+                            <div class="tr-interpret-card hover-lift">
+                                <div class="tr-interpret-if">If t-SNE shows</div>
+                                <h5><span class="hl hl-purple">Well-separated</span> clusters</h5>
+                                <div class="tr-interpret-then">→ Encoder learned meaningful cardiac features</div>
+                            </div>
+                            <div class="tr-interpret-card hover-lift">
+                                <div class="tr-interpret-if">If noise stress test shows</div>
+                                <h5>High <span class="hl hl-blue">cosine similarity</span></h5>
+                                <div class="tr-interpret-then">→ Embeddings are robust to perturbations</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ── Section 6: Suggested Optimizations ──────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle" data-target="sec-optimizations">
+                        <span class="tr-toggle-num">06</span>
+                        <span class="tr-toggle-title">Suggested Optimizations</span>
+                        <span class="tr-toggle-arrow">▸</span>
+                    </button>
+                    <div class="tr-body" id="sec-optimizations">
+
+                        <div class="tr-opt-grid">
+                            <div class="tr-opt-card hover-lift">
+                                <div class="tr-opt-num">1</div>
+                                <h5>Add ECG Data Augmentation</h5>
+                                <p>Improve generalization with:</p>
+                                <div class="tr-info-row">
+                                    <div class="tr-info-chip muted">Gaussian noise</div>
+                                    <div class="tr-info-chip muted">Random lead masking</div>
+                                    <div class="tr-info-chip muted">Time scaling</div>
+                                    <div class="tr-info-chip muted">Random cropping</div>
+                                </div>
+                                <div class="tr-code">x = x + torch.randn_like(x) * <span class="hl hl-green">0.01</span></div>
+                            </div>
+
+                            <div class="tr-opt-card hover-lift">
+                                <div class="tr-opt-num">2</div>
+                                <h5>Increase Receptive Field</h5>
+                                <p>Use <span class="hl hl-purple">dilated convolutions</span> instead of large downsampling.</p>
+                                <div class="tr-code">Conv1D(dilation=<span class="hl hl-blue">2</span>)</div>
+                                <p>Captures <span class="hl hl-blue">long-range rhythm</span> patterns.</p>
+                            </div>
+
+                            <div class="tr-opt-card hover-lift">
+                                <div class="tr-opt-num">3</div>
+                                <h5>Add Attention Layer</h5>
+                                <p>Hybrid model architecture:</p>
+                                <div class="tr-block-flow compact">
+                                    <span>CNN</span><span>→</span>
+                                    <span>Self Attention</span><span>→</span>
+                                    <span>Classifier</span>
+                                </div>
+                                <p>Helps detect <span class="hl hl-purple">global rhythm</span> patterns.</p>
+                            </div>
+
+                            <div class="tr-opt-card hover-lift">
+                                <div class="tr-opt-num">4</div>
+                                <h5>Use Focal Loss</h5>
+                                <p>For <span class="hl hl-orange">class imbalance</span> handling.</p>
+                                <div class="tr-code">FocalLoss(γ=<span class="hl hl-blue">2</span>)</div>
+                                <p>Improves <span class="hl hl-green">rare disease detection</span>.</p>
+                            </div>
+
+                            <div class="tr-opt-card hover-lift">
+                                <div class="tr-opt-num">5</div>
+                                <h5>Pretraining via Self-Supervised Learning</h5>
+                                <p>Method: <span class="hl hl-purple">SimCLR / BYOL</span> — Contrastive ECG learning.</p>
+                                <p>Then <span class="hl hl-green">fine-tune</span> classifier on labeled data.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ── Section 7: Final Assessment ─────────────────── -->
+                <div class="tr-section reveal">
+                    <button class="tr-toggle" data-target="sec-assessment">
+                        <span class="tr-toggle-num">07</span>
+                        <span class="tr-toggle-title">Final Engineering Assessment</span>
+                        <span class="tr-toggle-arrow">▸</span>
+                    </button>
+                    <div class="tr-body" id="sec-assessment">
+
+                        <div class="tr-two-col">
+                            <div class="tr-col-card assessment-strengths hover-lift">
+                                <h5>✅ Strengths</h5>
+                                <ul class="tr-list">
+                                    <li><span class="hl hl-green">Clean</span> signal preprocessing</li>
+                                    <li><span class="hl hl-green">Residual CNN</span> encoder</li>
+                                    <li>Good parameter efficiency (<span class="hl hl-green">~103K</span>)</li>
+                                    <li>Proper <span class="hl hl-green">multi-label</span> loss</li>
+                                    <li>Advanced evaluation (<span class="hl hl-purple">t-SNE</span>, <span class="hl hl-blue">saliency</span>, noise tests)</li>
+                                </ul>
+                            </div>
+                            <div class="tr-col-card assessment-weaknesses hover-lift">
+                                <h5>⚠️ Weaknesses</h5>
+                                <ul class="tr-list">
+                                    <li><span class="hl hl-red">No augmentation</span></li>
+                                    <li>Possible <span class="hl hl-orange">output-layer mismatch</span></li>
+                                    <li><span class="hl hl-orange">Limited</span> temporal modeling</li>
+                                    <li>Class imbalance <span class="hl hl-red">not handled</span></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
